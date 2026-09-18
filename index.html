@@ -331,9 +331,10 @@
                 return;
             }
 
+            // Używamy kolumny 'name' zgodnie ze strukturą na Twoim screenie z Supabase
             const { error } = await supabaseClient.from('user_projects').insert({
                 user_id: currentUser.id,
-                project_name: projectName,
+                name: projectName,
                 data: { transactions }
             });
 
