@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiznesBudżet Cloud - Finanse JDG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4 md:p-8 flex flex-col">
+
+    <div class="max-w-7xl mx-auto w-full space-y-6 flex-1 flex flex-col">
+        
+        <!-- Nagłówek i logowanie -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-6 gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-emerald-400">BiznesBudżet <span class="text-xs bg-emerald-950 text-emerald-300 px-2 py-1 rounded-full border border-emerald-800">CLOUD</span></h1>
+                <p class="text-slate-400 text-sm mt-1">Zarządzaj finansami firmy w chmurze, loguj się przez Google i zapisuj projekty.</p>
+            </div>
+            
+            <div id="authSection" class="flex items-center gap-3">
+                <!-- Status i przycisk logowania -->
+                <div id="loggedOut" class="flex gap-2">
+                    <button onclick="loginWithGoogle()" class="bg-white hover:bg-slate-200 text-slate-900 font-semibold px-4 py-2 rounded-xl text-sm transition flex items-center gap-2 shadow">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                        Zaloguj przez Google
+                    </button>
+                </div>
+                <div id="loggedIn" class="hidden flex items-center gap-3 bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl">
+                    <span id="userEmail" class="text-xs text-slate-300"></span>
+                    <button onclick="logout()" class="text-xs text-rose-400 hover:underline">Wyloguj</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Główny layout: Boczny panel + Zawartość -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
+            
+            <!-- Boczny panel: Zapisane projekty / obliczenia -->
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-lg space-y-4 h-fit">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Twoje Obliczenia</h2>
+                    <button onclick="createNewProject()" class="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-800 px-2.5 py-1 rounded-lg transition">+ Nowy</button>
+                </div>
+                <div id="projectTitleDisplay" class="text-xs text-emerald-400 font-medium">Aktualny projekt: Brak</div>
+                
+                <div class="space-y-2 max-h-[300px] overflow-y-auto" id="projectsList">
+                    <p class="text-xs text-slate-500 text-center py-4">Zaloguj się, aby zobaczyć swoje zapisane projekty.</p>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800">
+                    <input type="text" id="projectNameInput" placeholder="Nazwa projektu (np. Marzec)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs mb-2 text-slate-200 focus:outline-none focus:border-emerald-500">
+                    <button onclick="saveCurrentProject()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-xl text-xs transition shadow">Zapisz w chmurze</button>
+                </div>
+            </div>
+
+            <!-- Panel główny kalkulatora -->
+            <div class="lg:col-span-3 space-y-6">
+                
+                <!-- Kafelki podsumowania -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+                        <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Przychody (Netto)</p>
+                        <p id="sumIncome" class="text-lg font-bold text-emerald-400 mt-1">0,00 zł</p>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+                        <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Koszty (Netto)</p>
+                        <p id="sumExpenses" class="text-lg font-bold text-rose-400 mt-1">0,00 zł</p>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+                        <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Podatek (12%)</p>
+                        <p id="sumTax" class="text-lg font-bold text-amber-400 mt-1">0,00 zł</p>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+                        <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Rozliczenie VAT</p>
+                        <p id="sumVAT" class="text-lg font-bold text-purple-400 mt-1">0,00 zł</p>
+                        <span id="vatStatus" class="text-[9px] text-slate-400 block">Brak</span>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg">
+                        <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Zysk Netto</p>
+                        <p id="sumNetProfit" class="text-lg font-bold text-sky-400 mt-1">0,00 zł</p>
+                    </div>
+                </div>
+
+                <!-- Formularz i Tabela -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Formularz -->
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-lg h-fit space-y-3">
+                        <h2 class="text-sm font-semibold text-slate-200">Dodaj transakcję</h2>
+                        <form id="transactionForm" onsubmit="addTransaction(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">Nazwa</label>
+                                <input type="text" id="transName" required placeholder="np. Faktura / Usługa" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">Kwota Netto (zł)</label>
+                                <input type="number" step="0.01" id="transAmount" required placeholder="0.00" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-200">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">Typ</label>
+                                <select id="transType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-200">
+                                    <option value="income">Przychód (Sprzedaż)</option>
+                                    <option value="expense">Koszt (Zakup)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-medium text-slate-400 mb-1">VAT</label>
+                                <select id="transVatRate" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 text-slate-200">
+                                    <option value="23">23%</option>
+                                    <option value="8">8%</option>
+                                    <option value="5">5%</option>
+                                    <option value="0">0%</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold py-2 rounded-xl transition text-xs">Dodaj</button>
+                        </form>
+                    </div>
+
+                    <!-- Tabela -->
+                    <div class="md:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-lg space-y-3">
+                        <h2 class="text-sm font-semibold text-slate-200">Historia operacji</h2>
+                        <div class="overflow-x-auto max-h-[350px] overflow-y-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-800 text-[10px] font-medium text-slate-400 uppercase">
+                                        <th class="pb-2">Nazwa</th>
+                                        <th class="pb-2">Typ</th>
+                                        <th class="pb-2">Netto</th>
+                                        <th class="pb-2">VAT</th>
+                                        <th class="pb-2 text-right">Akcja</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionList" class="divide-y divide-slate-800">
+                                    <tr><td colspan="5" class="py-4 text-center text-slate-500">Brak transakcji.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Skrypt integracji z Supabase i logiką -->
+    <script>
+        const SUPABASE_URL = 'https://unjynbsswcgkrszekiek.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_Fg1vOJVtCLTtFC6ME6AH3Q_nCXibMhG';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let currentProjectId = null;
+        let transactions = [];
+
+        // Inicjalizacja sesji
+        async function initAuth() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            handleSession(session);
+
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                handleSession(session);
+            });
+        }
+
+        function handleSession(session) {
+            currentUser = session?.user || null;
+            if (currentUser) {
+                document.getElementById('loggedOut').classList.add('hidden');
+                document.getElementById('loggedIn').classList.remove('hidden');
+                document.getElementById('userEmail').innerText = currentUser.email;
+                loadUserProjects();
+            } else {
+                document.getElementById('loggedOut').classList.remove('hidden');
+                document.getElementById('loggedIn').classList.add('hidden');
+                document.getElementById('projectsList').innerHTML = `<p class="text-xs text-slate-500 text-center py-4">Zaloguj się, aby zobaczyć zapisane projekty.</p>`;
+                transactions = [];
+                render();
+            }
+        }
+
+        async function loginWithGoogle() {
+            await supabaseClient.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.href }
+            });
+        }
+
+        async function logout() {
+            await supabaseClient.auth.signOut();
+        }
+
+        // Pobieranie listy projektów użytkownika z bazy Supabase
+        async function loadUserProjects() {
+            if (!currentUser) return;
+            const { data, error } = await supabaseClient
+                .from('user_projects')
+                .select('id, name')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+
+            const listEl = document.getElementById('projectsList');
+            if (error || !data || data.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">Brak zapisanych projektów.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            data.forEach(proj => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-3 py-2 rounded-xl text-xs transition flex justify-between items-center ${currentProjectId === proj.id ? 'bg-emerald-950 border border-emerald-800 text-emerald-300 font-medium' : 'bg-slate-950 text-slate-300 hover:bg-slate-800'}`;
+                btn.innerHTML = `<span>${proj.name}</span> <span class="text-[10px] text-slate-500">Wczytaj</span>`;
+                btn.onclick = () => loadProjectData(proj.id, proj.name);
+                listEl.appendChild(btn);
+            });
+        }
+
+        // Tworzenie nowego projektu
+        function createNewProject() {
+            currentProjectId = null;
+            transactions = [];
+            document.getElementById('projectTitleDisplay').innerText = "Aktualny projekt: Nowy (niezapisany)";
+            document.getElementById('projectNameInput').value = '';
+            render();
+        }
+
+        // Wczytywanie konkretnego projektu
+        async function loadProjectData(id, name) {
+            currentProjectId = id;
+            document.getElementById('projectTitleDisplay').innerText = `Aktualny projekt: ${name}`;
+            document.getElementById('projectNameInput').value = name;
+
+            const { data, error } = await supabaseClient
+                .from('user_projects')
+                .select('data')
+                .eq('id', id)
+                .single();
+
+            if (!error && data) {
+                transactions = data.data || [];
+                render();
+            }
+        }
+
+        // Zapisywanie projektu do bazy Supabase
+        async function saveCurrentProject() {
+            if (!currentUser) {
+                alert("Musisz być zalogowany, aby zapisywać w chmurze!");
+                return;
+            }
+            const nameInput = document.getElementById('projectNameInput').value.trim();
+            if (!nameInput) {
+                alert("Wpisz nazwę projektu!");
+                return;
+            }
+
+            const projectPayload = {
+                user_id: currentUser.id,
+                name: nameInput,
+                data: transactions
+            };
+
+            if (currentProjectId) {
+                // Aktualizuj istniejący
+                const { error } = await supabaseClient
+                    .from('user_projects')
+                    .update({ name: nameInput, data: transactions })
+                    .eq('id', currentProjectId);
+                if (error) alert("Błąd zapisu: " + error.message);
+                else alert("Zaktualizowano projekt w chmurze!");
+            } else {
+                // Utwórz nowy
+                const { data, error } = await supabaseClient
+                    .from('user_projects')
+                    .insert([projectPayload])
+                    .select();
+                if (error) {
+                    alert("Błąd zapisu: " + error.message);
+                } else if (data && data[0]) {
+                    currentProjectId = data[0].id;
+                    alert("Zapisano nowy projekt w chmurze!");
+                    loadUserProjects();
+                }
+            }
+            document.getElementById('projectTitleDisplay').innerText = `Aktualny projekt: ${nameInput}`;
+        }
+
+        // Logika transakcji i kalkulatora
+        function addTransaction(e) {
+            e.preventDefault();
+            const name = document.getElementById('transName').value;
+            const amount = parseFloat(document.getElementById('transAmount').value);
+            const type = document.getElementById('transType').value;
+            const vatRate = parseFloat(document.getElementById('transVatRate').value);
+
+            transactions.push({ id: Date.now(), name, amount, type, vatRate });
+            document.getElementById('transactionForm').reset();
+            render();
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            render();
+        }
+
+        function render() {
+            const list = document.getElementById('transactionList');
+            list.innerHTML = '';
+
+            let totalIncomeNet = 0;
+            let totalExpensesNet = 0;
+            let totalOutputVat = 0;
+            let totalInputVat = 0;
+
+            if (transactions.length === 0) {
+                list.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-500">Brak transakcji w tym projekcie.</td></tr>`;
+            }
+
+            transactions.forEach(t => {
+                const vatAmount = t.amount * (t.vatRate / 100);
+                if (t.type === 'income') {
+                    totalIncomeNet += t.amount;
+                    totalOutputVat += vatAmount;
+                } else {
+                    totalExpensesNet += t.amount;
+                    totalInputVat += vatAmount;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-2.5 font-medium text-slate-200">${t.name}</td>
+                    <td class="py-2.5"><span class="px-2 py-0.5 text-[10px] rounded-full font-medium ${t.type === 'income' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">${t.type === 'income' ? 'Przychód' : 'Koszt'}</span></td>
+                    <td class="py-2.5 font-semibold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} zł</td>
+                    <td class="py-2.5 text-slate-300 text-[11px]">${vatAmount.toFixed(2)} zł (${t.vatRate}%)</td>
+                    <td class="py-2.5 text-right"><button onclick="deleteTransaction(${t.id})" class="text-slate-500 hover:text-rose-400 transition text-[11px]">Usuń</button></td>
+                `;
+                list.appendChild(tr);
+            });
+
+            let vatDifference = totalOutputVat - totalInputVat;
+            let incomeBeforeTax = totalIncomeNet - totalExpensesNet;
+            if (incomeBeforeTax < 0) incomeBeforeTax = 0;
+            let estimatedTax = incomeBeforeTax * 0.12;
+            let netProfit = (totalIncomeNet - totalExpensesNet) - estimatedTax;
+
+            document.getElementById('sumIncome').innerText = totalIncomeNet.toFixed(2) + ' zł';
+            document.getElementById('sumExpenses').innerText = totalExpensesNet.toFixed(2) + ' zł';
+            document.getElementById('sumTax').innerText = estimatedTax.toFixed(2) + ' zł';
+            
+            const vatEl = document.getElementById('sumVAT');
+            const vatStatusEl = document.getElementById('vatStatus');
+            if (vatDifference > 0) {
+                vatEl.innerText = vatDifference.toFixed(2) + ' zł';
+                vatEl.className = "text-lg font-bold text-rose-400 mt-1";
+                vatStatusEl.innerText = "Do zapłaty US";
+            } else if (vatDifference < 0) {
+                vatEl.innerText = Math.abs(vatDifference).toFixed(2) + ' zł';
+                vatEl.className = "text-lg font-bold text-emerald-400 mt-1";
+                vatStatusEl.innerText = "Zwrot VAT";
+            } else {
+                vatEl.innerText = "0,00 zł";
+                vatEl.className = "text-lg font-bold text-purple-400 mt-1";
+                vatStatusEl.innerText = "Brak";
+            }
+
+            document.getElementById('sumNetProfit').innerText = netProfit.toFixed(2) + ' zł';
+        }
+
+        initAuth();
+    </script>
+</body>
+</html>
