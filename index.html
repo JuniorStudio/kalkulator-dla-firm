@@ -14,9 +14,7 @@
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-black text-emerald-400 tracking-wider">BiznesBudżet <span class="text-xs bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full font-normal">CLOUD</span></h1>
         </div>
-        <div id="auth-header-section" class="flex items-center gap-3">
-            <!-- Wstrzykiwane dynamicznie -->
-        </div>
+        <div id="auth-header-section" class="flex items-center gap-3"></div>
     </header>
 
     <!-- MODAL / EKRAN LOGOWANIA -->
@@ -173,7 +171,6 @@
             renderHeader();
             updateCalculations();
 
-            // Nasłuchiwanie zmian stanu logowania w czasie rzeczywistym
             supabaseClient.auth.onAuthStateChange((event, session) => {
                 currentUser = session?.user || null;
                 renderHeader();
