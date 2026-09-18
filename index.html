@@ -13,6 +13,9 @@
     <header class="border-b border-slate-800 p-4 px-6 flex justify-between items-center bg-[#0b0f19]/80 backdrop-blur sticky top-0 z-50">
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-black text-emerald-400 tracking-wider">BiznesBudżet <span class="text-xs bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full font-normal">CLOUD</span></h1>
+            <div id="nbp-rates-ticker" class="hidden md:flex items-center gap-3 text-xs text-slate-400 border-l border-slate-800 pl-3">
+                <span>Kursy NBP: Ładowanie...</span>
+            </div>
         </div>
         <div id="auth-header-section" class="flex items-center gap-3"></div>
     </header>
@@ -115,9 +118,19 @@
                             <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Nazwa</label>
                             <input type="text" id="t-name" placeholder="np. Faktura / Usługa" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500">
                         </div>
-                        <div>
-                            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Kwota Netto (zł)</label>
-                            <input type="number" step="0.01" id="t-amount" placeholder="0.00" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Kwota Netto</label>
+                                <input type="number" step="0.01" id="t-amount" placeholder="0.00" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Waluta</label>
+                                <select id="t-currency" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500">
+                                    <option value="PLN">PLN (zł)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                    <option value="USD">USD ($)</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Typ</label>
@@ -127,12 +140,12 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">VAT</label>
+                            <label class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Stawka VAT (do czego się stosuje)</label>
                             <select id="t-vat" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500">
-                                <option value="23">23%</option>
-                                <option value="8">8%</option>
-                                <option value="5">5%</option>
-                                <option value="0">0% / zwolniony</option>
+                                <option value="23">23% — Podstawowa (ogólna stawka dla towarów i usług)</option>
+                                <option value="8">8% — Obniżona (np. budownictwo mieszkaniowe, wybrane usługi)</option>
+                                <option value="5">5% — Preferencyjna (np. podstawowa żywność, książki)</option>
+                                <option value="0">0% / zwolniony — Eksport, WDT lub zwolnienie podmiotowe</option>
                             </select>
                         </div>
                         <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold p-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20">Dodaj</button>
@@ -149,14 +162,15 @@
                             <tr class="border-b border-slate-800 text-xs uppercase tracking-wider text-slate-500">
                                 <th class="pb-3 font-semibold">Nazwa</th>
                                 <th class="pb-3 font-semibold">Typ</th>
-                                <th class="pb-3 font-semibold">Netto</th>
+                                <th class="pb-3 font-semibold">Netto (Wpisane)</th>
+                                <th class="pb-3 font-semibold">Netto (PLN)</th>
                                 <th class="pb-3 font-semibold">VAT</th>
                                 <th class="pb-3 font-semibold text-right">Akcja</th>
                             </tr>
                         </thead>
                         <tbody id="transactions-list" class="text-sm divide-y divide-slate-800/40">
                             <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-500">Brak transakcji w tym projekcie.</td>
+                                <td colspan="6" class="py-8 text-center text-slate-500">Brak transakcji w tym projekcie.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -179,8 +193,10 @@
         let currentUser = null;
         let transactions = [];
         let isLoginModalMode = true;
+        let exchangeRates = { EUR: 4.30, USD: 4.00 }; // Domyślne awaryjne kursy
 
         async function init() {
+            await fetchNbpRates();
             const { data: { session } } = await supabaseClient.auth.getSession();
             currentUser = session?.user || null;
             renderHeader();
@@ -190,6 +206,25 @@
                 currentUser = session?.user || null;
                 renderHeader();
             });
+        }
+
+        async function fetchNbpRates() {
+            try {
+                const response = await fetch('https://api.nbp.pl/api/exchangerates/tables/a/?format=json');
+                const data = await response.json();
+                if (data && data[0] && data[0].rates) {
+                    data[0].rates.forEach(r => {
+                        if (r.code === 'EUR') exchangeRates.EUR = r.mid;
+                        if (r.code === 'USD') exchangeRates.USD = r.mid;
+                    });
+                }
+                const ticker = document.getElementById('nbp-rates-ticker');
+                if (ticker) {
+                    ticker.innerHTML = `<span>1 EUR = <strong class="text-emerald-400">${exchangeRates.EUR.toFixed(2)} zł</strong></span><span>1 USD = <strong class="text-emerald-400">${exchangeRates.USD.toFixed(2)} zł</strong></span>`;
+                }
+            } catch (e) {
+                console.error('Nie udało się pobrać kursów NBP:', e);
+            }
         }
 
         function renderHeader() {
@@ -266,11 +301,26 @@
         function addTransaction(e) {
             e.preventDefault();
             const name = document.getElementById('t-name').value;
-            const amount = parseFloat(document.getElementById('t-amount').value) || 0;
+            const rawAmount = parseFloat(document.getElementById('t-amount').value) || 0;
+            const currency = document.getElementById('t-currency').value;
             const type = document.getElementById('t-type').value;
             const vat = parseFloat(document.getElementById('t-vat').value) || 0;
 
-            transactions.push({ id: Date.now(), name, amount, type, vat });
+            // Przeliczanie na PLN do spójnych obliczeń
+            let amountInPLN = rawAmount;
+            if (currency === 'EUR') amountInPLN = rawAmount * exchangeRates.EUR;
+            if (currency === 'USD') amountInPLN = rawAmount * exchangeRates.USD;
+
+            transactions.push({ 
+                id: Date.now(), 
+                name, 
+                amount: amountInPLN, 
+                originalAmount: rawAmount, 
+                currency, 
+                type, 
+                vat 
+            });
+
             document.getElementById('t-name').value = '';
             document.getElementById('t-amount').value = '';
             renderTransactions();
@@ -286,19 +336,26 @@
         function renderTransactions() {
             const tbody = document.getElementById('transactions-list');
             if (transactions.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">Brak transakcji w tym projekcie.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Brak transakcji w tym projekcie.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = transactions.map(t => `
-                <tr class="border-b border-slate-800/40">
-                    <td class="py-3 font-medium text-white">${t.name}</td>
-                    <td class="py-3"><span class="px-2 py-1 rounded-lg text-xs font-semibold ${t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">${t.type === 'income' ? 'Przychód' : 'Koszt'}</span></td>
-                    <td class="py-3">${t.amount.toFixed(2)} zł</td>
-                    <td class="py-3">${t.vat}%</td>
-                    <td class="py-3 text-right"><button type="button" onclick="removeTransaction(${t.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold">Usuń</button></td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = transactions.map(t => {
+                const currSymbol = t.currency === 'EUR' ? '€' : t.currency === 'USD' ? '$' : 'zł';
+                const formattedOriginal = `${t.originalAmount.toFixed(2)} ${currSymbol}`;
+                const formattedPLN = `${t.amount.toFixed(2)} zł`;
+
+                return `
+                    <tr class="border-b border-slate-800/40">
+                        <td class="py-3 font-medium text-white">${t.name}</td>
+                        <td class="py-3"><span class="px-2 py-1 rounded-lg text-xs font-semibold ${t.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">${t.type === 'income' ? 'Przychód' : 'Koszt'}</span></td>
+                        <td class="py-3 text-slate-300">${formattedOriginal}</td>
+                        <td class="py-3 font-semibold text-white">${t.currency !== 'PLN' ? formattedPLN : '-'}</td>
+                        <td class="py-3">${t.vat}%</td>
+                        <td class="py-3 text-right"><button type="button" onclick="removeTransaction(${t.id})" class="text-rose-400 hover:text-rose-300 text-xs font-semibold">Usuń</button></td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function updateCalculations() {
@@ -445,7 +502,6 @@
             if (error) {
                 alert('Błąd usuwania: ' + error.message);
             } else {
-                // Odśwież listę w modalu
                 fetchCloudProjects();
             }
         }
